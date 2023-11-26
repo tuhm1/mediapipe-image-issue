@@ -23,12 +23,7 @@
       </div>
       <div>
         <h3>Image from ndarray</h3>
-        <div>
-          <p>Some images may cause the program to stop</p>
-          <div>
-            <button id="py-ndarray-button">Run</button>
-          </div>
-        </div>
+        <p>Some images may cause the program to stop</p>
         <div id="py-ndarray-result">
         </div>
       </div>
@@ -100,19 +95,17 @@
     }
 
     const pyNdArrayResult = document.getElementById("py-ndarray-result");
-    document.getElementById("py-ndarray-button").onclick = async () => {
-      for (const image of images) {
-        const formData = new FormData();
-        formData.append("file", image.blob);
-        const response = await fetch(`/api/image-from-ndarray`, {
-          method: "POST",
-          body: formData,
-        });
-        let result = await response.json();
-        result = toCamelCase(result);
-        pyNdArrayResult.append(renderResult(image.path, result));
-      }
-    };
+    for (const image of images) {
+      const formData = new FormData();
+      formData.append("file", image.blob);
+      const response = await fetch(`/api/image-from-ndarray`, {
+        method: "POST",
+        body: formData,
+      });
+      let result = await response.json();
+      result = toCamelCase(result);
+      pyNdArrayResult.append(renderResult(image.path, result));
+    }
 
     function renderResult(src, result) {
       const container = document.createElement("div");
