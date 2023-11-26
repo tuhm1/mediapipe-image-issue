@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <div>
+    <h2>JavaScript version</h2>
+    <div id="js-result">
+    </div>
+  </div>
+  <div>
+    <h2>Python version</h2>
+    <div>
+      <div>
+        <h3>Image from file</h3>
+        <div id="py-file-result">
+        </div>
+      </div>
+      <div>
+        <h3>Image from ndarray</h3>
+        <div>
+          <p>Some images may cause the program to stop</p>
+          <div>
+            <button id="py-ndarray-button">Run</button>
+          </div>
+        </div>
+        <div id="py-ndarray-result">
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import {
+      ObjectDetector,
+      FilesetResolver,
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2";
+    import _ from "https://cdn.jsdelivr.net/npm/lodash@4.17.21/+esm";
+
+    const imageNames = [
+      "110467527_p15_master1200.jpg", // no problem
+      "110467527_p17_master1200.jpg", // no problem
+      "111194419_p0_master1200.jpg", // no problem
+      "000000006.png",
+      "000000007.png",
+      "000000008.png",
+      "000000009.png",
+      "7b25e4ba-1c18-45b3-b5ff-4065a144bf65.jpg",
+      "66d001c4-bf9d-4883-be03-0fa230669838.jpg",
+      "a3b2c6af-9995-4d60-b3ab-e4e32345797f.jpg",
+      "fa920889-37db-4915-abde-7287f6de1ad6.jpg",
+    ];
+
+    const images = await Promise.all(
+      imageNames.map(async (name) => {
+        const path = `/images/${name}`;
+        const res = await fetch(path);
+        const blob = await res.blob();
+        return { name, path, blob };
+      }),
+    );
+
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm",
+    );
+    const detector = await ObjectDetector.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: "model.tflite",
+        //delegate: "GPU"
+      },
+      scoreThreshold: 0.5,
+      runningMode: "IMAGE",
+    });
+    const jsResult = document.getElementById("js-result");
+    for (const image of images) {
+      const img = document.createElement("img");
+      img.src = image.path;
+      await new Promise((resolve) => {
+        img.onload = resolve;
+      });
+      const result = detector.detect(img);
+      jsResult.append(renderResult(image.path, result));
+    }
+
+    const pyFileResult = document.getElementById("py-file-result");
+    for (const image of images) {
+      const formData = new FormData();
+      formData.append("file", image.blob);
+      const response = await fetch(`/api/image-from-file`, {
+        method: "POST",
+        body: formData,
+      });
+      let result = await response.json();
+      result = toCamelCase(result);
+      pyFileResult.append(renderResult(image.path, result));
+    }
+
+    const pyNdArrayResult = document.getElementById("py-ndarray-result");
+    document.getElementById("py-ndarray-button").onclick = async () => {
+      for (const image of images) {
+        const formData = new FormData();
+        formData.append("file", image.blob);
+        const response = await fetch(`/api/image-from-ndarray`, {
+          method: "POST",
+          body: formData,
+        });
+        let result = await response.json();
+        result = toCamelCase(result);
+        pyNdArrayResult.append(renderResult(image.path, result));
+      }
+    };
+
+    function renderResult(src, result) {
+      const container = document.createElement("div");
+      container.style.position = "relative";
+      const img = document.createElement("img");
+      img.src = src;
+      img.style.display = "block";
+      container.append(img);
+      result.detections.forEach((detection) => {
+        const {
+          boundingBox: { originX, originY, width, height },
+          categories: [{ score }],
+        } = detection;
+        const detectionDiv = document.createElement("div");
+        Object.assign(detectionDiv.style, {
+          position: "absolute",
+          left: `${originX}px`,
+          top: `${originY}px`,
+          width: `${width}px`,
+          height: `${height}px`,
+          border: "1px solid red",
+          color: "red",
+          fontWeight: "bold"
+        });
+        detectionDiv.textContent = `score: ${score}`;
+        container.append(detectionDiv);
+      });
+      return container;
+    }
+
+    function toCamelCase(obj) {
+      return _.transform(obj, (acc, value, key, target) => {
+        const camelKey = _.isArray(target) ? key : _.camelCase(key);
+        acc[camelKey] = _.isObject(value) ? toCamelCase(value) : value;
+      });
+    }
+
+
+  </script>
+</body>
+
+</html>
