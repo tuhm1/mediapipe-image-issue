@@ -29,12 +29,17 @@
       </div>
     </div>
   </div>
+  <div>
+    <button id="save">Save result images</button>
+  </div>
   <script type="module">
     import {
       ObjectDetector,
       FilesetResolver,
     } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2";
     import _ from "https://cdn.jsdelivr.net/npm/lodash@4.17.21/+esm";
+    import { toBlob } from "https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/+esm";
+    import fileSaver from "https://cdn.jsdelivr.net/npm/file-saver@2.0.5/+esm";
 
     const imageNames = [
       "110467527_p15_master1200.jpg", // no problem
@@ -59,6 +64,14 @@
       }),
     );
 
+    const htmlResults = [];
+    document.getElementById("save").onclick = () => {
+      htmlResults.forEach(async ({ htmlResult, image, version }) => {
+        const blob = await toBlob(htmlResult);
+        fileSaver.saveAs(blob, `${image.name}-${version}.png`);
+      });
+    }
+
     const vision = await FilesetResolver.forVisionTasks(
       "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm",
     );
@@ -78,7 +91,9 @@
         img.onload = resolve;
       });
       const result = detector.detect(img);
-      jsResult.append(renderResult(image.path, result));
+      const htmlResult = renderResult(image.path, result);
+      jsResult.append(htmlResult);
+      htmlResults.push({ htmlResult, image, version: "js" });
     }
 
     const pyFileResult = document.getElementById("py-file-result");
@@ -91,7 +106,9 @@
       });
       let result = await response.json();
       result = toCamelCase(result);
-      pyFileResult.append(renderResult(image.path, result));
+      const htmlResult = renderResult(image.path, result);
+      pyFileResult.append(htmlResult);
+      htmlResults.push({ htmlResult, image, version: "py-file" });
     }
 
     const pyNdArrayResult = document.getElementById("py-ndarray-result");
@@ -104,12 +121,15 @@
       });
       let result = await response.json();
       result = toCamelCase(result);
-      pyNdArrayResult.append(renderResult(image.path, result));
+      const htmlResult = renderResult(image.path, result);
+      pyNdArrayResult.append(htmlResult);
+      htmlResults.push({ htmlResult, image, version: "py-ndarray" });
     }
 
     function renderResult(src, result) {
       const container = document.createElement("div");
       container.style.position = "relative";
+      container.style.width = "fit-content";
       const img = document.createElement("img");
       img.src = src;
       img.style.display = "block";
